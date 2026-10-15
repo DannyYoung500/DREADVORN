@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#101512">
+<title>DREADVORN — Survival Test</title>
+<style>
+:root{color-scheme:dark;--lime:#c6f36b;--panel:rgba(9,15,12,.82);--line:rgba(198,243,107,.34)}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#111713;font-family:system-ui,-apple-system,Segoe UI,sans-serif;touch-action:none}
+#game{position:fixed;inset:0}canvas{display:block;width:100%;height:100%}
+#hud{position:fixed;inset:0;pointer-events:none;color:#f2f4ed}
+.top{position:absolute;left:14px;right:14px;top:max(12px,env(safe-area-inset-top));display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.brand,.stats{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;backdrop-filter:blur(8px)}
+.brand strong{display:block;letter-spacing:.14em;font-size:15px;color:var(--lime)}.brand small{font-size:10px;letter-spacing:.13em;color:#bdc6b9}
+.stats{display:flex;gap:14px;font-size:12px}.stats b{display:block;font-size:17px;color:var(--lime)}
+#objective{position:absolute;top:92px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);padding:8px 13px;border-radius:999px;white-space:nowrap;font-size:12px}
+#healthWrap{position:absolute;left:14px;top:93px;width:150px;background:#1d2720;border:1px solid #51614a;height:10px;border-radius:20px;overflow:hidden}#health{height:100%;width:100%;background:linear-gradient(90deg,#82c84a,#d2f76e);transition:width .15s}
+#hint{position:absolute;left:50%;bottom:20%;transform:translateX(-50%);font-size:12px;color:#d8e2d1;background:rgba(0,0,0,.48);padding:7px 11px;border-radius:8px;text-align:center;max-width:85%}
+#controls{position:fixed;inset:0;pointer-events:none}
+#stickArea{pointer-events:auto;position:absolute;left:18px;bottom:max(22px,env(safe-area-inset-bottom));width:138px;height:138px;border-radius:50%;background:rgba(16,25,19,.46);border:1px solid rgba(255,255,255,.18);touch-action:none}
+#stick{position:absolute;left:43px;top:43px;width:50px;height:50px;border-radius:50%;background:rgba(198,243,107,.7);border:2px solid #e5ffc0;box-shadow:0 0 20px #9dd44b44}
+#fire{pointer-events:auto;position:absolute;right:22px;bottom:max(35px,env(safe-area-inset-bottom));width:84px;height:84px;border-radius:50%;border:2px solid #ffd0bd;background:rgba(157,45,29,.78);color:#fff;font-weight:900;letter-spacing:.08em;touch-action:none;box-shadow:0 0 22px #e34b3033}
+#fire:active{transform:scale(.95);background:#d43f28}
+#restart{pointer-events:auto;position:absolute;left:50%;top:58%;transform:translate(-50%,-50%);border:0;border-radius:10px;background:var(--lime);color:#101510;font-weight:900;padding:13px 22px;display:none}
+#overlay{position:fixed;inset:0;background:rgba(5,8,6,.78);display:none;align-items:center;justify-content:center;text-align:center;color:white;padding:24px}
+#overlay .card{max-width:360px;border:1px solid var(--line);background:#101712;padding:26px;border-radius:18px}#overlay h1{color:var(--lime);letter-spacing:.12em;margin:0 0 8px}#overlay p{color:#c4cfc0;line-height:1.5}
+@media(min-width:800px){#stickArea,#fire{opacity:.72}.brand strong{font-size:18px}#hint{bottom:24px}}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="hud">
+ <div class="top"><div class="brand"><strong>DREADVORN</strong><small>FIELD TEST // SECTOR 01</small></div><div class="stats"><div>WAVE<b id="wave">1</b></div><div>KILLS<b id="kills">0</b></div><div>AMMO<b id="ammo">∞</b></div></div></div>
+ <div id="healthWrap"><div id="health"></div></div>
+ <div id="objective">SURVIVE THE INCOMING</div>
+ <div id="hint">Move with the left stick · Tap FIRE to shoot</div>
+</div>
+<div id="controls"><div id="stickArea"><div id="stick"></div></div><button id="fire">FIRE</button></div>
+<div id="overlay"><div class="card"><h1 id="endTitle">YOU DIED</h1><p id="endText">The infected took the sector.</p><button id="restart">REDEPLOY</button></div></div>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
+<script type="module">
+import * as THREE from 'three';
+
+const mount=document.querySelector('#game');
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x77857d);
+scene.fog=new THREE.Fog(0x77857d,28,105);
+const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,180);
+const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.12;mount.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xc8d9cb,0x273027,2.0));
+const sun=new THREE.DirectionalLight(0xffe6c2,2.4);sun.position.set(-18,30,12);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-40;sun.shadow.camera.right=40;sun.shadow.camera.top=40;sun.shadow.camera.bottom=-40;scene.add(sun);
+const mats={
+ ground:new THREE.MeshStandardMaterial({color:0x626a5c,roughness:1}),
+ concrete:new THREE.MeshStandardMaterial({color:0x77796e,roughness:.94}),
+ dark:new THREE.MeshStandardMaterial({color:0x29332e,roughness:.9}),
+ rust:new THREE.MeshStandardMaterial({color:0x724638,roughness:.88}),
+ window:new THREE.MeshStandardMaterial({color:0x1a2828,roughness:.45,metalness:.2}),
+ player:new THREE.MeshStandardMaterial({color:0x344a3c,roughness:.75}),
+ skin:new THREE.MeshStandardMaterial({color:0xc79b78,roughness:.8}),
+ zombie:new THREE.MeshStandardMaterial({color:0x7e9872,roughness:.9}),
+ red:new THREE.MeshStandardMaterial({color:0x512d2b,roughness:.9})
+};
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(180,180),mats.ground);ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+const grid=new THREE.GridHelper(180,90,0x829078,0x65705f);grid.position.y=.015;grid.material.transparent=true;grid.material.opacity=.14;scene.add(grid);
+function box(w,h,d,mat,x,y,z,cast=true){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);m.castShadow=cast;m.receiveShadow=true;scene.add(m);return m}
+function makeBuilding(x,z,w,d,h,rot=0){const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=rot;
+ const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mats.concrete);body.position.y=h/2;body.castShadow=true;body.receiveShadow=true;g.add(body);
+ const roof=new THREE.Mesh(new THREE.BoxGeometry(w+.5,.28,d+.5),mats.dark);roof.position.y=h+.12;roof.castShadow=true;g.add(roof);
+ for(let y=1.25;y<h-0.5;y+=1.65){for(let xx=-w/2+1;xx<w/2-.3;xx+=2.15){const win=new THREE.Mesh(new THREE.BoxGeometry(.95,.82,.08),mats.window);win.position.set(xx,y,d/2+.045);g.add(win);const sill=new THREE.Mesh(new THREE.BoxGeometry(1.05,.09,.18),mats.rust);sill.position.set(xx,y-.47,d/2+.08);g.add(sill)}}
+ scene.add(g);return g}
+makeBuilding(-12,-10,10,8,8,.12);makeBuilding(13,-15,9,10,11,-.2);makeBuilding(-20,12,8,11,6,.4);makeBuilding(20,14,12,8,9,-.5);makeBuilding(0,-30,16,8,7,0);
+for(let i=0;i<32;i++){const x=(Math.random()-.5)*76,z=(Math.random()-.5)*76;if(Math.abs(x)<8&&Math.abs(z)<8)continue;const h=.5+Math.random()*1.5;box(.8+Math.random()*1.6,h,.7+Math.random()*1.5,Math.random()>.5?mats.dark:mats.rust,x,h/2,z)}
+// A few dead trees make the skyline less empty.
+for(let i=0;i<13;i++){const x=(Math.random()-.5)*68,z=(Math.random()-.5)*68;if(Math.abs(x)<10&&Math.abs(z)<10)continue;const trunk=box(.35,2.5,.35,mats.dark,x,1.25,z);for(let j=0;j<3;j++){const limb=box(.18,1.3,.18,mats.dark,x+(Math.random()-.5)*1.3,2+Math.random(),z+(Math.random()-.5)*1.3);limb.rotation.z=(Math.random()-.5)*1.4}}
+// Player: simple readable 3D survivor with rifle.
+const player=new THREE.Group();scene.add(player);
+const torso=new THREE.Mesh(new THREE.BoxGeometry(.72,1.05,.42),mats.player);torso.position.y=1.35;torso.castShadow=true;player.add(torso);
+const head=new THREE.Mesh(new THREE.SphereGeometry(.27,12,10),mats.skin);head.position.y=2.08;head.castShadow=true;player.add(head);
+const legs=[];for(const x of [-.22,.22]){const leg=new THREE.Mesh(new THREE.BoxGeometry(.25,.72,.28),mats.dark);leg.position.set(x,.43,0);leg.castShadow=true;player.add(leg);legs.push(leg)}
+const arm=new THREE.Mesh(new THREE.BoxGeometry(.22,.72,.23),mats.player);arm.position.set(.48,1.42,-.12);arm.rotation.z=-.35;player.add(arm);
+const rifle=new THREE.Mesh(new THREE.BoxGeometry(.16,.16,.9),new THREE.MeshStandardMaterial({color:0x171c19,metalness:.65,roughness:.4}));rifle.position.set(.48,1.48,-.62);player.add(rifle);
+const muzzle=new THREE.Object3D();muzzle.position.set(.48,1.48,-1.08);player.add(muzzle);
+player.position.set(0,0,4);
+const worldForward=new THREE.Vector3(0,0,-1);
+const zombies=[];let health=100,kills=0,wave=1,gameOver=false,spawnClock=0,fireClock=0,damageClock=0;
+function makeZombie(x,z){const g=new THREE.Group();const skin=new THREE.MeshStandardMaterial({color:new THREE.Color().setHSL(.24+Math.random()*.07,.22,.38+Math.random()*.12),roughness:.95});
+ const body=new THREE.Mesh(new THREE.BoxGeometry(.68,1.0,.4),skin);body.position.y=1.15;body.castShadow=true;g.add(body);
+ const head=new THREE.Mesh(new THREE.SphereGeometry(.25,10,8),skin);head.position.y=1.83;head.castShadow=true;g.add(head);
+ for(const lx of [-.2,.2]){const l=new THREE.Mesh(new THREE.BoxGeometry(.23,.68,.25),mats.red);l.position.set(lx,.36,0);l.castShadow=true;g.add(l)}
+ for(const ax of [-.46,.46]){const a=new THREE.Mesh(new THREE.BoxGeometry(.18,.7,.2),skin);a.position.set(ax,1.15,-.05);a.rotation.z=ax<0?-.22:.22;g.add(a)}
+ g.position.set(x,0,z);scene.add(g);zombies.push({group:g,hp:3,speed:1.0+Math.random()*.45,attack:0,hit:0,skin})}
+function spawnWave(){const count=3+wave*2;for(let i=0;i<count;i++){const a=Math.random()*Math.PI*2,r=17+Math.random()*12;makeZombie(player.position.x+Math.cos(a)*r,player.position.z+Math.sin(a)*r)}}
+spawnWave();
+const stickArea=document.querySelector('#stickArea'),stick=document.querySelector('#stick'),fireBtn=document.querySelector('#fire');
+let moveX=0,moveY=0,stickPointer=null,fireHeld=false;
+function setStick(e){const r=stickArea.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let dx=e.clientX-cx,dy=e.clientY-cy;const max=44,len=Math.hypot(dx,dy)||1;if(len>max){dx=dx/len*max;dy=dy/len*max}stick.style.transform='translate('+dx+'px,'+dy+'px)';moveX=dx/max;moveY=dy/max}
+stickArea.addEventListener('pointerdown',e=>{stickPointer=e.pointerId;stickArea.setPointerCapture(e.pointerId);setStick(e)});
+stickArea.addEventListener('pointermove',e=>{if(e.pointerId===stickPointer)setStick(e)});
+function resetStick(){stickPointer=null;moveX=moveY=0;stick.style.transform='translate(0,0)'}
+stickArea.addEventListener('pointerup',resetStick);stickArea.addEventListener('pointercancel',resetStick);
+fireBtn.addEventListener('pointerdown',e=>{e.preventDefault();fireHeld=true;fireBtn.setPointerCapture(e.pointerId);shoot()});fireBtn.addEventListener('pointerup',()=>fireHeld=false);fireBtn.addEventListener('pointercancel',()=>fireHeld=false);
+const keys={};addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.code==='Space'){e.preventDefault();shoot()}});addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+function shoot(){if(gameOver||fireClock>0)return;fireClock=.24;
+ const from=player.position.clone().add(new THREE.Vector3(0,1.5,0));const forward=new THREE.Vector3(0,0,-1).applyQuaternion(player.quaternion);let target=null,best=34;
+ for(const z of zombies){if(z.hp<=0)continue;const p=z.group.position.clone().add(new THREE.Vector3(0,1.1,0)),d=p.clone().sub(from),dist=d.length();if(dist>best)continue;const angle=forward.angleTo(d.normalize());if(angle<.34){best=dist;target=z}}
+ if(target){target.hp--;target.hit=.12;target.group.traverse(o=>{if(o.isMesh&&o.material&&o.material.color)o.material.color.set(0xc1d2a0)});if(target.hp<=0){scene.remove(target.group);zombies.splice(zombies.indexOf(target),1);kills++;document.querySelector('#kills').textContent=kills}}
+ // brief muzzle flash
+ const flash=new THREE.PointLight(0xffb65b,5,5);flash.position.copy(muzzle.getWorldPosition(new THREE.Vector3()));scene.add(flash);setTimeout(()=>scene.remove(flash),55);
+}
+function setHealth(v){health=Math.max(0,Math.min(100,v));document.querySelector('#health').style.width=health+'%';if(health<=0)endGame()}
+function endGame(){if(gameOver)return;gameOver=true;document.querySelector('#endTitle').textContent='YOU DIED';document.querySelector('#endText').textContent='You eliminated '+kills+' infected. The sector has fallen.';document.querySelector('#restart').style.display='inline-block';document.querySelector('#overlay').style.display='flex'}
+function restart(){for(const z of zombies)scene.remove(z.group);zombies.length=0;health=100;kills=0;wave=1;gameOver=false;player.position.set(0,0,4);player.rotation.y=0;setHealth(100);document.querySelector('#kills').textContent='0';document.querySelector('#wave').textContent='1';document.querySelector('#overlay').style.display='none';document.querySelector('#restart').style.display='none';spawnWave()}
+document.querySelector('#restart').addEventListener('click',restart);
+const clock=new THREE.Clock();let walkT=0;
+function update(dt){if(gameOver)return;fireClock=Math.max(0,fireClock-dt);damageClock=Math.max(0,damageClock-dt);if(fireHeld)shoot();
+ let ix=moveX,iy=moveY;if(keys.a||keys.arrowleft)ix-=1;if(keys.d||keys.arrowright)ix+=1;if(keys.w||keys.arrowup)iy-=1;if(keys.s||keys.arrowdown)iy+=1;const mag=Math.hypot(ix,iy);if(mag>1){ix/=mag;iy/=mag}
+ const moving=Math.abs(ix)+Math.abs(iy)>.06;
+ if(moving){const speed=5.2;player.position.x+=ix*speed*dt;player.position.z+=iy*speed*dt;player.position.x=THREE.MathUtils.clamp(player.position.x,-78,78);player.position.z=THREE.MathUtils.clamp(player.position.z,-78,78);player.rotation.y=Math.atan2(-ix,-iy);walkT+=dt*10;legs[0].rotation.x=Math.sin(walkT)*.45;legs[1].rotation.x=-Math.sin(walkT)*.45}else{legs.forEach(l=>l.rotation.x=0)}
+ const desired=new THREE.Vector3(player.position.x,5.2,player.position.z+8.8);camera.position.lerp(desired,1-Math.pow(.001,dt));camera.lookAt(player.position.x,1.1,player.position.z-1.8);
+ spawnClock+=dt;if(zombies.length===0&&spawnClock>2){wave++;spawnClock=0;document.querySelector('#wave').textContent=wave;document.querySelector('#objective').textContent='WAVE '+wave+' — HOLD THE SECTOR';spawnWave()}
+ for(const z of zombies){const delta=player.position.clone().sub(z.group.position);const dist=delta.length();if(dist>1.25){delta.normalize();z.group.position.addScaledVector(delta,z.speed*dt);z.group.rotation.y=Math.atan2(-delta.x,-delta.z)}else if(z.attack<=0){z.attack=1.0;if(damageClock<=0){setHealth(health-9);damageClock=.3}}
+ if(z.hit>0){z.hit-=dt;z.group.position.y=.04}else z.group.position.y=0;
+ }
+}
+function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.04);update(dt);renderer.render(scene,camera)}
+camera.position.set(0,5.2,12);camera.lookAt(0,1,0);animate();
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));renderer.setSize(innerWidth,innerHeight)});
+document.querySelector('#hint').textContent=matchMedia('(pointer:coarse)').matches?'Left stick to move · Face the infected and tap FIRE':'WASD / arrows to move · SPACE to fire';
+</script>
+</body>
+</html>
