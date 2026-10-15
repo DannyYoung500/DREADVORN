@@ -121,7 +121,7 @@ function update(dt){if(gameOver)return;fireClock=Math.max(0,fireClock-dt);damage
  if(moving){const speed=5.2;player.position.x+=ix*speed*dt;player.position.z+=iy*speed*dt;player.position.x=THREE.MathUtils.clamp(player.position.x,-78,78);player.position.z=THREE.MathUtils.clamp(player.position.z,-78,78);player.rotation.y=Math.atan2(-ix,-iy);walkT+=dt*10;legs[0].rotation.x=Math.sin(walkT)*.45;legs[1].rotation.x=-Math.sin(walkT)*.45}else{legs.forEach(l=>l.rotation.x=0)}
  const desired=new THREE.Vector3(player.position.x,5.2,player.position.z+8.8);camera.position.lerp(desired,1-Math.pow(.001,dt));camera.lookAt(player.position.x,1.1,player.position.z-1.8);
  spawnClock+=dt;if(zombies.length===0&&spawnClock>2){wave++;spawnClock=0;document.querySelector('#wave').textContent=wave;document.querySelector('#objective').textContent='WAVE '+wave+' — HOLD THE SECTOR';spawnWave()}
- for(const z of zombies){const delta=player.position.clone().sub(z.group.position);const dist=delta.length();if(dist>1.25){delta.normalize();z.group.position.addScaledVector(delta,z.speed*dt);z.group.rotation.y=Math.atan2(-delta.x,-delta.z)}else if(z.attack<=0){z.attack=1.0;if(damageClock<=0){setHealth(health-9);damageClock=.3}}
+ for(const z of zombies){z.attack=Math.max(0,z.attack-dt);const delta=player.position.clone().sub(z.group.position);const dist=delta.length();if(dist>1.25){delta.normalize();z.group.position.addScaledVector(delta,z.speed*dt);z.group.rotation.y=Math.atan2(-delta.x,-delta.z)}else if(z.attack<=0){z.attack=1.0;if(damageClock<=0){setHealth(health-9);damageClock=.3}}
  if(z.hit>0){z.hit-=dt;z.group.position.y=.04}else z.group.position.y=0;
  }
 }
