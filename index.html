@@ -91,7 +91,8 @@ makePickup('med','Medical supplies',-9,-2,0x62d8a2);
 makePickup('intel','Hospital incident report',-1,-25,0xd6c58c);
 function interact(){if(gameOver)return;let nearest=null,best=2.7;for(const p of pickups){if(p.used)continue;const d=player.position.distanceTo(p.group.position);if(d<best){best=d;nearest=p}}if(!nearest){document.querySelector('#hint').textContent='Nothing to interact with nearby.';return}nearest.used=true;scene.remove(nearest.group);document.querySelector('#interact').style.display='none';if(nearest.type==='ammo'){reserve+=24;updateAmmo();document.querySelector('#hint').textContent='AMMO RECOVERED · +24 ROUNDS';}else if(nearest.type==='med'){setHealth(health+35);document.querySelector('#hint').textContent='MEDICAL SUPPLIES USED · HEALTH RESTORED';}else{document.querySelector('#hint').textContent='INCIDENT REPORT: “Ward C was sealed after the first patients turned. Evacuation route moved to the lower service tunnel. Do not trust the emergency broadcast.”';document.querySelector('#objective').textContent='CLUE FOUND — SEARCH THE DISTRICT';}}
 document.querySelector('#interact').addEventListener('pointerdown',e=>{e.preventDefault();interact()});
-\n// Player: simple readable 3D survivor with rifle.
+
+// Player: simple readable 3D survivor with rifle.
 const player=new THREE.Group();scene.add(player);
 const torso=new THREE.Mesh(new THREE.BoxGeometry(.72,1.05,.42),mats.player);torso.position.y=1.35;torso.castShadow=true;player.add(torso);
 const head=new THREE.Mesh(new THREE.SphereGeometry(.27,12,10),mats.skin);head.position.y=2.08;head.castShadow=true;player.add(head);
@@ -140,7 +141,8 @@ document.querySelector('#restart').addEventListener('click',restart);
 const clock=new THREE.Clock();let walkT=0;
 function update(dt){if(gameOver)return;fireClock=Math.max(0,fireClock-dt);damageClock=Math.max(0,damageClock-dt);if(reloading){reloadClock-=dt;if(reloadClock<=0){const n=Math.min(12-ammo,reserve);ammo+=n;reserve-=n;reloading=false;updateAmmo();document.querySelector('#hint').textContent='MAGAZINE READY';}}if(fireHeld)shoot();
  let ix=moveX,iy=moveY;if(keys.a||keys.arrowleft)ix-=1;if(keys.d||keys.arrowright)ix+=1;if(keys.w||keys.arrowup)iy-=1;if(keys.s||keys.arrowdown)iy+=1;const mag=Math.hypot(ix,iy);if(mag>1){ix/=mag;iy/=mag}
- const moving=Math.abs(ix)+Math.abs(iy)>.06;\n let nearestPickup=2.7;for(const p of pickups){if(p.used)continue;const d=player.position.distanceTo(p.group.position);if(d<nearestPickup)nearestPickup=d;}document.querySelector('#interact').style.display=nearestPickup<2.7?'block':'none';
+ const moving=Math.abs(ix)+Math.abs(iy)>.06;
+ let nearestPickup=2.7;for(const p of pickups){if(p.used)continue;const d=player.position.distanceTo(p.group.position);if(d<nearestPickup)nearestPickup=d;}document.querySelector('#interact').style.display=nearestPickup<2.7?'block':'none';
  if(moving){const speed=5.2;player.position.x+=ix*speed*dt;player.position.z+=iy*speed*dt;player.position.x=THREE.MathUtils.clamp(player.position.x,-78,78);player.position.z=THREE.MathUtils.clamp(player.position.z,-78,78);player.rotation.y=Math.atan2(-ix,-iy);walkT+=dt*10;legs[0].rotation.x=Math.sin(walkT)*.45;legs[1].rotation.x=-Math.sin(walkT)*.45}else{legs.forEach(l=>l.rotation.x=0)}
  const desired=new THREE.Vector3(player.position.x,5.2,player.position.z+8.8);camera.position.lerp(desired,1-Math.pow(.001,dt));camera.lookAt(player.position.x,1.1,player.position.z-1.8);
 
