@@ -15,6 +15,9 @@
 .brand strong{display:block;letter-spacing:.14em;font-size:15px;color:var(--lime)}.brand small{font-size:10px;letter-spacing:.13em;color:#bdc6b9}
 .stats{display:flex;gap:14px;font-size:12px}.stats b{display:block;font-size:17px;color:var(--lime)}
 #objective{position:absolute;top:92px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);padding:8px 13px;border-radius:999px;white-space:nowrap;font-size:12px}
+#clock{position:absolute;right:14px;top:92px;background:var(--panel);border:1px solid var(--line);padding:7px 10px;border-radius:9px;font-size:11px;letter-spacing:.06em;color:#f0f4e9}
+#rotate{display:none;position:fixed;z-index:20;inset:0;background:#0d120f;color:#f4f7ed;align-items:center;justify-content:center;text-align:center;padding:28px;font-weight:800;letter-spacing:.04em}
+@media (orientation:portrait) and (pointer:coarse){#rotate{display:flex}#rotate span{display:block;font-size:14px;font-weight:500;line-height:1.6;color:#c4cfbf;margin-top:10px}}
 #healthWrap{position:absolute;left:14px;top:93px;width:150px;background:#1d2720;border:1px solid #51614a;height:10px;border-radius:20px;overflow:hidden}#health{height:100%;width:100%;background:linear-gradient(90deg,#82c84a,#d2f76e);transition:width .15s}
 #hint{position:absolute;left:50%;bottom:20%;transform:translateX(-50%);font-size:12px;color:#d8e2d1;background:rgba(0,0,0,.48);padding:7px 11px;border-radius:8px;text-align:center;max-width:85%}
 #controls{position:fixed;inset:0;pointer-events:none}
@@ -37,10 +40,12 @@
  <div class="top"><div class="brand"><strong>DREADVORN</strong><small>FIELD TEST // SECTOR 01</small></div><div class="stats"><div>INFECTED<b id="kills">0</b></div><div>AMMO<b id="ammo">12/60</b></div></div></div>
  <div id="healthWrap"><div id="health"></div></div>
  <div id="objective">FIND THE ABANDONED HOSPITAL</div>
- <div id="hint">Move with the left stick · Tap FIRE to shoot</div>
+ <div id="clock">09:00 AM · MORNING</div>
+ <div id="hint">Move with the left stick · Drag to look · Tap FIRE to shoot</div>
 </div>
 <div id="controls"><div id="stickArea"><div id="stick"></div></div><button id="fire">FIRE</button><button class="action" id="reload">RELOAD</button><button class="action" id="interact">INTERACT</button></div>
 <div id="overlay"><div class="card"><h1 id="endTitle">YOU DIED</h1><p id="endText">The infected took the sector.</p><button id="restart">REDEPLOY</button></div></div>
+<div id="rotate">ROTATE YOUR PHONE<br><span>DREADVORN is designed to be played horizontally in landscape mode.</span></div>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
 <script type="module">
 import * as THREE from 'three';
@@ -53,8 +58,11 @@ const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,180);
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
 renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.12;mount.appendChild(renderer.domElement);
-scene.add(new THREE.HemisphereLight(0xc8d9cb,0x273027,2.0));
+const hemi=new THREE.HemisphereLight(0xc8d9cb,0x273027,1.9);scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xffe6c2,2.4);sun.position.set(-18,30,12);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-40;sun.shadow.camera.right=40;sun.shadow.camera.top=40;sun.shadow.camera.bottom=-40;scene.add(sun);
+const moon=new THREE.DirectionalLight(0x91b5ee,.08);moon.position.set(15,18,-12);scene.add(moon);
+const daySky=new THREE.Color(0x91b9cf),sunsetSky=new THREE.Color(0xd68a58),nightSky=new THREE.Color(0x101b2c);
+let gameMinutes=9*60;
 const mats={
  ground:new THREE.MeshStandardMaterial({color:0x626a5c,roughness:1}),
  concrete:new THREE.MeshStandardMaterial({color:0x77796e,roughness:.94}),
@@ -69,7 +77,11 @@ const mats={
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(180,180),mats.ground);ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
 const grid=new THREE.GridHelper(180,90,0x829078,0x65705f);grid.position.y=.015;grid.material.transparent=true;grid.material.opacity=.14;scene.add(grid);
 function box(w,h,d,mat,x,y,z,cast=true){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);m.castShadow=cast;m.receiveShadow=true;scene.add(m);return m}
+const buildingBounds=[];
 function makeBuilding(x,z,w,d,h,rot=0){const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=rot;
+ const ex=Math.abs(Math.cos(rot))*w/2+Math.abs(Math.sin(rot))*d/2;
+ const ez=Math.abs(Math.sin(rot))*w/2+Math.abs(Math.cos(rot))*d/2;
+ buildingBounds.push({x,z,minX:x-ex,maxX:x+ex,minZ:z-ez,maxZ:z+ez});
  const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mats.concrete);body.position.y=h/2;body.castShadow=true;body.receiveShadow=true;g.add(body);
  const roof=new THREE.Mesh(new THREE.BoxGeometry(w+.5,.28,d+.5),mats.dark);roof.position.y=h+.12;roof.castShadow=true;g.add(roof);
  for(let y=1.25;y<h-0.5;y+=1.65){for(let xx=-w/2+1;xx<w/2-.3;xx+=2.15){const win=new THREE.Mesh(new THREE.BoxGeometry(.95,.82,.08),mats.window);win.position.set(xx,y,d/2+.045);g.add(win);const sill=new THREE.Mesh(new THREE.BoxGeometry(1.05,.09,.18),mats.rust);sill.position.set(xx,y-.47,d/2+.08);g.add(sill)}}
@@ -102,6 +114,20 @@ const rifle=new THREE.Mesh(new THREE.BoxGeometry(.16,.16,.9),new THREE.MeshStand
 const muzzle=new THREE.Object3D();muzzle.position.set(.48,1.48,-1.08);player.add(muzzle);
 player.position.set(0,0,4);
 const worldForward=new THREE.Vector3(0,0,-1);
+let cameraYaw=0,cameraPitch=.08,lookPointer=null,lastLookX=0,lastLookY=0;
+renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
+renderer.domElement.addEventListener('pointerdown',e=>{
+ if(e.pointerType==='mouse'&&e.button!==2)return;
+ lookPointer=e.pointerId;lastLookX=e.clientX;lastLookY=e.clientY;
+ if(e.pointerType!=='mouse')renderer.domElement.setPointerCapture(e.pointerId);
+});
+renderer.domElement.addEventListener('pointermove',e=>{
+ if(lookPointer!==e.pointerId)return;
+ const dx=e.clientX-lastLookX,dy=e.clientY-lastLookY;lastLookX=e.clientX;lastLookY=e.clientY;
+ cameraYaw-=dx*.006;cameraPitch=THREE.MathUtils.clamp(cameraPitch+dy*.004,-.22,.55);
+});
+function stopLook(e){if(lookPointer===e.pointerId)lookPointer=null}
+renderer.domElement.addEventListener('pointerup',stopLook);renderer.domElement.addEventListener('pointercancel',stopLook);
 const zombies=[];let health=100,kills=0,gameOver=false,fireClock=0,damageClock=0,ammo=12,reserve=60,reloading=false,reloadClock=0;
 function makeZombie(x,z){const g=new THREE.Group();const skin=new THREE.MeshStandardMaterial({color:new THREE.Color().setHSL(.24+Math.random()*.07,.22,.38+Math.random()*.12),roughness:.95});
  const body=new THREE.Mesh(new THREE.BoxGeometry(.68,1.0,.4),skin);body.position.y=1.15;body.castShadow=true;g.add(body);
@@ -128,7 +154,7 @@ function updateAmmo(){document.querySelector('#ammo').textContent=ammo+'/'+reser
 function reload(){if(gameOver||reloading||ammo===12||reserve<=0)return;reloading=true;reloadClock=1.15;document.querySelector('#hint').textContent='RELOADING…';}
 document.querySelector('#reload').addEventListener('pointerdown',e=>{e.preventDefault();reload()});
 function shoot(){if(gameOver||fireClock>0||reloading)return;if(ammo<=0){document.querySelector('#hint').textContent='MAGAZINE EMPTY — TAP RELOAD';return}ammo--;updateAmmo();fireClock=.24;
- const from=player.position.clone().add(new THREE.Vector3(0,1.5,0));const forward=new THREE.Vector3(0,0,-1).applyQuaternion(player.quaternion);let target=null,best=34;
+ const from=player.position.clone().add(new THREE.Vector3(0,1.5,0));const forward=new THREE.Vector3(0,0,-1).applyAxisAngle(new THREE.Vector3(0,1,0),cameraYaw);let target=null,best=34;
  for(const z of zombies){if(z.hp<=0)continue;const p=z.group.position.clone().add(new THREE.Vector3(0,1.1,0)),d=p.clone().sub(from),dist=d.length();if(dist>best)continue;const angle=forward.angleTo(d.normalize());if(angle<.34){best=dist;target=z}}
  if(target){target.hp--;target.hit=.12;target.group.traverse(o=>{if(o.isMesh&&o.material&&o.material.color)o.material.color.set(0xc1d2a0)});if(target.hp<=0){scene.remove(target.group);zombies.splice(zombies.indexOf(target),1);kills++;document.querySelector('#kills').textContent=kills}}
  // brief muzzle flash
@@ -139,12 +165,44 @@ function endGame(){if(gameOver)return;gameOver=true;document.querySelector('#end
 function restart(){for(const z of zombies)scene.remove(z.group);zombies.length=0;health=100;kills=0;ammo=12;reserve=60;reloading=false;gameOver=false;player.position.set(0,0,4);player.rotation.y=0;setHealth(100);updateAmmo();document.querySelector('#kills').textContent='0';document.querySelector('#objective').textContent='FIND THE ABANDONED HOSPITAL';document.querySelector('#overlay').style.display='none';document.querySelector('#restart').style.display='none';spawnInitialInfected()}
 document.querySelector('#restart').addEventListener('click',restart);
 const clock=new THREE.Clock();let walkT=0;
-function update(dt){if(gameOver)return;fireClock=Math.max(0,fireClock-dt);damageClock=Math.max(0,damageClock-dt);if(reloading){reloadClock-=dt;if(reloadClock<=0){const n=Math.min(12-ammo,reserve);ammo+=n;reserve-=n;reloading=false;updateAmmo();document.querySelector('#hint').textContent='MAGAZINE READY';}}if(fireHeld)shoot();
+function updateDayNight(dt){
+ gameMinutes=(gameMinutes+dt*2.4)%(24*60);
+ const hour=gameMinutes/60;
+ const daylight=THREE.MathUtils.smoothstep(hour,5.2,8.0)*(1-THREE.MathUtils.smoothstep(hour,17.2,20.2));
+ const sunset=Math.max(THREE.MathUtils.smoothstep(hour,16.8,18.5)*(1-THREE.MathUtils.smoothstep(hour,18.5,20.2)),THREE.MathUtils.smoothstep(hour,4.5,6.2)*(1-THREE.MathUtils.smoothstep(hour,6.2,7.4)));
+ const sky=new THREE.Color();
+ if(sunset>.01){sky.copy(daySky).lerp(sunsetSky,sunset*.82).lerp(nightSky,1-daylight)}else sky.copy(nightSky).lerp(daySky,daylight);
+ scene.background.copy(sky);scene.fog.color.copy(sky);
+ hemi.intensity=.22+daylight*1.75;sun.intensity=.06+daylight*2.45;moon.intensity=.04+(1-daylight)*.34;
+ sun.position.set(Math.cos((hour-12)/12*Math.PI)*35,Math.sin((hour-6)/12*Math.PI)*38,12);
+ moon.position.set(-sun.position.x,Math.max(8,30-sun.position.y),-18);
+ const h=Math.floor(hour)%24,m=Math.floor(gameMinutes%60),amp=h>=12?'PM':'AM',displayHour=(h%12)||12;
+ const period=hour<5.2?'NIGHT':hour<8?'MORNING':hour<15?'DAYTIME':hour<17.2?'AFTERNOON':hour<20.2?'SUNSET':'NIGHT';
+ document.querySelector('#clock').textContent=String(displayHour).padStart(2,'0')+':'+String(m).padStart(2,'0')+' '+amp+' · '+period;
+}
+function collidesWithBuilding(x,z){
+ const r=.42;
+ return buildingBounds.some(b=>x+r>b.minX&&x-r<b.maxX&&z+r>b.minZ&&z-r<b.maxZ);
+}
+function update(dt){updateDayNight(dt);if(gameOver)return;fireClock=Math.max(0,fireClock-dt);damageClock=Math.max(0,damageClock-dt);if(reloading){reloadClock-=dt;if(reloadClock<=0){const n=Math.min(12-ammo,reserve);ammo+=n;reserve-=n;reloading=false;updateAmmo();document.querySelector('#hint').textContent='MAGAZINE READY';}}if(fireHeld)shoot();
  let ix=moveX,iy=moveY;if(keys.a||keys.arrowleft)ix-=1;if(keys.d||keys.arrowright)ix+=1;if(keys.w||keys.arrowup)iy-=1;if(keys.s||keys.arrowdown)iy+=1;const mag=Math.hypot(ix,iy);if(mag>1){ix/=mag;iy/=mag}
  const moving=Math.abs(ix)+Math.abs(iy)>.06;
  let nearestPickup=2.7;for(const p of pickups){if(p.used)continue;const d=player.position.distanceTo(p.group.position);if(d<nearestPickup)nearestPickup=d;}document.querySelector('#interact').style.display=nearestPickup<2.7?'block':'none';
- if(moving){const speed=5.2;player.position.x+=ix*speed*dt;player.position.z+=iy*speed*dt;player.position.x=THREE.MathUtils.clamp(player.position.x,-78,78);player.position.z=THREE.MathUtils.clamp(player.position.z,-78,78);player.rotation.y=Math.atan2(-ix,-iy);walkT+=dt*10;legs[0].rotation.x=Math.sin(walkT)*.45;legs[1].rotation.x=-Math.sin(walkT)*.45}else{legs.forEach(l=>l.rotation.x=0)}
- const desired=new THREE.Vector3(player.position.x,5.2,player.position.z+8.8);camera.position.lerp(desired,1-Math.pow(.001,dt));camera.lookAt(player.position.x,1.1,player.position.z-1.8);
+ if(moving){
+  const speed=keys.shift?7.1:5.2;
+  const sin=Math.sin(cameraYaw),cos=Math.cos(cameraYaw);
+  const dx=(ix*cos+iy*sin)*speed*dt,dz=(-ix*sin+iy*cos)*speed*dt;
+  const oldX=player.position.x,oldZ=player.position.z;
+  if(!collidesWithBuilding(oldX+dx,oldZ))player.position.x+=dx;
+  if(!collidesWithBuilding(player.position.x,oldZ+dz))player.position.z+=dz;
+  player.position.x=THREE.MathUtils.clamp(player.position.x,-78,78);player.position.z=THREE.MathUtils.clamp(player.position.z,-78,78);
+  const moveAngle=Math.atan2(-dx,-dz);player.rotation.y=moveAngle;
+  walkT+=dt*(keys.shift?15:10);legs[0].rotation.x=Math.sin(walkT)*.48;legs[1].rotation.x=-Math.sin(walkT)*.48;
+ }else{legs.forEach(l=>l.rotation.x=0)}
+ const cameraDistance=8.8;
+ const desired=new THREE.Vector3(player.position.x+Math.sin(cameraYaw)*cameraDistance,5.0+cameraPitch*5,player.position.z+Math.cos(cameraYaw)*cameraDistance);
+ camera.position.lerp(desired,1-Math.pow(.001,dt));
+ camera.lookAt(player.position.x,1.25,player.position.z);
 
  for(const z of zombies){z.attack=Math.max(0,z.attack-dt);const delta=player.position.clone().sub(z.group.position);const dist=delta.length();if(dist>1.25){delta.normalize();z.group.position.addScaledVector(delta,z.speed*dt);z.group.rotation.y=Math.atan2(-delta.x,-delta.z)}else if(z.attack<=0){z.attack=1.0;if(damageClock<=0){setHealth(health-9);damageClock=.3}}
  if(z.hit>0){z.hit-=dt;z.group.position.y=.04}else z.group.position.y=0;
@@ -153,7 +211,8 @@ function update(dt){if(gameOver)return;fireClock=Math.max(0,fireClock-dt);damage
 function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.04);update(dt);renderer.render(scene,camera)}
 camera.position.set(0,5.2,12);camera.lookAt(0,1,0);animate();
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));renderer.setSize(innerWidth,innerHeight)});
-document.querySelector('#hint').textContent=matchMedia('(pointer:coarse)').matches?'Left stick to move · FIRE to shoot · RELOAD to refill':'WASD / arrows to move · SPACE to shoot · R to reload';
+document.querySelector('#hint').textContent=matchMedia('(pointer:coarse)').matches?'Left stick to move · Drag open screen to look · FIRE to shoot · RELOAD to refill':'WASD to move · Right mouse drag to look · SPACE to shoot · R to reload · SHIFT to sprint';
+try{if(screen.orientation&&screen.orientation.lock)screen.orientation.lock('landscape').catch(()=>{});}catch(e){}
 </script>
 </body>
 </html>
