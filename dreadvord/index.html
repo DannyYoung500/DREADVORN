@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0b0d10">
+<title>DREADVORD — The Fallen Kingdom</title>
+<style>
+:root{--gold:#d8b46a;--panel:rgba(9,11,14,.86);--line:rgba(216,180,106,.5)}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#080a0d;color:#f4eee1;font-family:system-ui,-apple-system,Segoe UI,sans-serif;touch-action:none;overscroll-behavior:none;user-select:none;-webkit-user-select:none}
+#game,canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#hud{position:fixed;inset:0;pointer-events:none;z-index:4}
+.top{position:absolute;left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));top:max(10px,env(safe-area-inset-top));display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 11px;backdrop-filter:blur(6px)}
+.brand b{display:block;letter-spacing:.18em;color:var(--gold);font-size:clamp(13px,2.4vw,19px)}.brand small{font-size:9px;letter-spacing:.13em;color:#c1b7a2}
+.stats{display:flex;gap:13px;font-size:10px;color:#c1b7a2}.stats b{display:block;color:#fff2d6;font-size:15px}
+#bars{position:absolute;left:12px;top:76px;width:min(210px,31vw)}.label{font-size:9px;letter-spacing:.14em;margin:5px 0 3px;color:#ded3be}.bar{height:7px;background:#262323;border:1px solid #5d5141;border-radius:8px;overflow:hidden}.fill{height:100%;width:100%;transition:width .12s}.hp{background:linear-gradient(90deg,#852f2b,#df6d54)}.stam{background:linear-gradient(90deg,#7c6936,#e0c16e)}
+#objective{position:absolute;top:76px;left:50%;transform:translateX(-50%);max-width:42vw;text-align:center;font-size:clamp(9px,1.5vw,12px);letter-spacing:.09em;color:#e8d9b8;text-shadow:0 2px 5px #000}
+#hint{position:absolute;bottom:18%;left:50%;transform:translateX(-50%);padding:7px 11px;border-radius:8px;background:#080a0dcc;color:#e4dac6;font-size:11px;text-align:center;max-width:78vw}
+#controls{position:fixed;inset:0;z-index:10;pointer-events:none}
+#stickArea{position:absolute;pointer-events:auto;left:max(18px,env(safe-area-inset-left));bottom:max(18px,env(safe-area-inset-bottom));width:clamp(94px,18vw,132px);height:clamp(94px,18vw,132px);border:1px solid #d8b46a70;border-radius:50%;background:#101318a8;touch-action:none}
+#stick{position:absolute;left:50%;top:50%;width:40%;height:40%;transform:translate(-50%,-50%);border-radius:50%;background:#c5a45caa;border:2px solid #f0d99c;box-shadow:0 0 18px #c49b4938;pointer-events:none}
+.actions{position:absolute;right:max(18px,env(safe-area-inset-right));bottom:max(18px,env(safe-area-inset-bottom));display:grid;grid-template-columns:repeat(2,clamp(58px,10vw,82px));gap:9px;align-items:end;pointer-events:none}
+.action{pointer-events:auto;touch-action:none;-webkit-tap-highlight-color:transparent;appearance:none;border:1px solid #d8b46a99;background:#101318eF;color:#f7e8c4;border-radius:50%;width:clamp(58px,10vw,82px);height:clamp(58px,10vw,82px);font-weight:900;font-size:clamp(9px,1.5vw,11px);letter-spacing:.05em;box-shadow:0 4px 16px #0008;display:flex;align-items:center;justify-content:center}
+.action.primary{background:#783329eF;border-color:#f0a08a}.action:active,.action.pressed{transform:scale(.94);filter:brightness(1.35)}
+#attack{grid-column:2;grid-row:2;width:clamp(68px,12vw,94px);height:clamp(68px,12vw,94px);background:#7d3027ef}
+#dodge{grid-column:1;grid-row:2}#guard{grid-column:1;grid-row:1}#lock{grid-column:2;grid-row:1}
+#rotate{display:none;position:fixed;inset:0;z-index:30;background:#080a0d;color:#f6e6c4;align-items:center;justify-content:center;text-align:center;padding:28px;font-weight:900;letter-spacing:.12em}
+#rotate span{display:block;font-weight:500;letter-spacing:0;line-height:1.6;color:#c4bba9;margin-top:10px;font-size:13px}
+@media(orientation:portrait) and (pointer:coarse){#rotate{display:flex}}
+#overlay{display:none;position:fixed;z-index:25;inset:0;background:#050608d9;align-items:center;justify-content:center;text-align:center;padding:24px}
+.card{max-width:380px;border:1px solid var(--line);background:#0c0f13;padding:24px;border-radius:16px}.card h1{color:var(--gold);letter-spacing:.12em}.card p{color:#d0c6b4;line-height:1.5}
+#restart{pointer-events:auto;border:1px solid var(--gold);background:#c4a05a;color:#111;padding:12px 22px;border-radius:8px;font-weight:900}
+@media(orientation:landscape) and (max-height:440px){.top{top:5px}.panel{padding:5px 8px}#bars{top:55px}#objective{top:58px}#hint{bottom:5px}.actions{grid-template-columns:repeat(2,58px);gap:5px}.action{width:52px;height:52px}#attack{width:60px;height:60px}#stickArea{width:92px;height:92px} }
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="hud">
+ <div class="top"><div class="panel brand"><b>DREADVORD</b><small>THE FALLEN KINGDOM · CHAPTER I</small></div><div class="panel stats"><div>GATEKEEPER<b id="enemyCount">02</b></div><div>SOULS<b id="souls">0</b></div></div></div>
+ <div id="bars"><div class="label">VITALITY</div><div class="bar"><div id="hp" class="fill hp"></div></div><div class="label">STAMINA</div><div class="bar"><div id="stamina" class="fill stam"></div></div></div>
+ <div id="objective">MISSION I · ENTER THE RUINED GATE</div><div id="hint">Move: left stick · Drag right side to turn · Attack / Dodge / Guard</div>
+</div>
+<div id="controls"><div id="stickArea"><div id="stick"></div></div><div class="actions">
+<button class="action" id="guard" aria-label="Guard">GUARD</button><button class="action" id="lock" aria-label="Lock target">LOCK</button><button class="action" id="dodge" aria-label="Dodge">DODGE</button><button class="action primary" id="attack" aria-label="Attack">ATTACK</button>
+</div></div>
+<div id="rotate">ROTATE YOUR PHONE<span>DREADVORD is designed for landscape play. Turn your phone sideways to continue.</span></div>
+<div id="overlay"><div class="card"><h1 id="endTitle">FALLEN</h1><p id="endText">Your journey is not over.</p><button id="restart">RISE AGAIN</button></div></div>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","GLTFLoader":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'GLTFLoader';
+const $=id=>document.getElementById(id);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x11151c);scene.fog=new THREE.Fog(0x11151c,18,68);
+const camera=new THREE.PerspectiveCamera(58,innerWidth/innerHeight,.1,140);
+const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio,1.35));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;$('game').appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0x9caec9,0x211c1b,1.5));
+const moon=new THREE.DirectionalLight(0xb4c9ff,2.0);moon.position.set(-12,22,9);scene.add(moon);
+const fireLight=new THREE.PointLight(0xff762c,4,15);fireLight.position.set(-4,3,-5);scene.add(fireLight);
+const mats={stone:new THREE.MeshStandardMaterial({color:0x42434a,roughness:1}),dark:new THREE.MeshStandardMaterial({color:0x191c22,roughness:.9}),gold:new THREE.MeshStandardMaterial({color:0x8e6c36,metalness:.6,roughness:.5}),ground:new THREE.MeshStandardMaterial({color:0x25252a,roughness:1}),enemy:new THREE.MeshStandardMaterial({color:0x6f2527,roughness:.85}),skin:new THREE.MeshStandardMaterial({color:0x8e8c8a,roughness:.8})};
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(100,100),mats.ground);floor.rotation.x=-Math.PI/2;floor.position.y=-.06;floor.receiveShadow=true;scene.add(floor);
+function box(w,h,d,mat,x,y,z){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;scene.add(m);return m}
+function pillar(x,z,h=7){box(1.7,h,1.7,mats.stone,x,h/2,z);box(2,.35,2,mats.dark,x,h+.12,z)}
+// Ruined gate and broken battlements
+for(const x of [-8,-6,6,8])pillar(x,-9,7+Math.random()*3);
+box(7,1.2,1.5,mats.stone,0,-.1,-9);
+for(let i=0;i<8;i++){const x=-10+i*2.8;box(2.6,5+Math.random()*3,2,mats.stone,x,2.5+Math.random(),-20)}
+for(let i=0;i<26;i++){const x=(Math.random()-.5)*32,z=-3-Math.random()*28;if(Math.abs(x)<2&&z>-12)continue;const r=.25+Math.random()*.7;const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(r,0),i%3?mats.stone:mats.dark);rock.position.set(x,r*.45,z);rock.rotation.set(Math.random(),Math.random(),Math.random());scene.add(rock)}
+function torch(x,z){const base=box(.2,1.7,.2,mats.dark,x,.85,z);const flame=new THREE.Mesh(new THREE.IcosahedronGeometry(.23,1),new THREE.MeshBasicMaterial({color:0xff762c}));flame.position.set(x,1.9,z);scene.add(flame);const l=new THREE.PointLight(0xff692c,2.4,9);l.position.set(x,2,z);scene.add(l);return {flame,l}}
+const torches=[torch(-5,-7),torch(5,-7),torch(-11,-18),torch(11,-18)];
+const player=new THREE.Group();scene.add(player);
+const fallback=new THREE.Group();
+function limb(w,h,d,mat,x,y,z){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);m.castShadow=true;fallback.add(m);return m}
+limb(.72,1.05,.42,mats.dark,0,1.25,0);limb(.82,.28,.48,mats.gold,0,1.6,0);limb(.4,.4,.4,mats.dark,0,2.02,0);
+for(const x of [-.23,.23]){limb(.25,.78,.28,mats.dark,x,.42,0);limb(.22,.7,.22,mats.stone,x*2,1.3,0)}
+const sword=new THREE.Mesh(new THREE.BoxGeometry(.12,1.15,.18),new THREE.MeshStandardMaterial({color:0xc8d3d8,metalness:.85,roughness:.22}));sword.position.set(.66,1.05,-.18);sword.rotation.x=-.2;fallback.add(sword);player.add(fallback);
+let knightModel=null;
+const loader=new GLTFLoader();loader.load('models/shadow-knight.glb',g=>{knightModel=g.scene;knightModel.scale.setScalar(1.6);knightModel.position.y=0;player.remove(fallback);player.add(knightModel);},undefined,()=>{});
+const enemies=[];
+function makeEnemy(x,z,boss=false){const g=new THREE.Group();const mat=boss?new THREE.MeshStandardMaterial({color:0x34262d,roughness:.75}):mats.enemy;
+const body=new THREE.Mesh(new THREE.BoxGeometry(boss?1.05:.7,boss?1.5:1.1,.5),mat);body.position.y=boss?1.45:1.12;body.castShadow=true;g.add(body);
+const head=new THREE.Mesh(new THREE.SphereGeometry(boss?.36:.25,10,8),mats.skin);head.position.y=boss?2.45:1.85;g.add(head);
+for(const s of [-1,1]){const arm=new THREE.Mesh(new THREE.BoxGeometry(.23,boss?1.1:.72,.25),mat);arm.position.set(s*(boss?.68:.46),boss?1.5:1.15,-.05);arm.rotation.z=s*.15;g.add(arm);const leg=new THREE.Mesh(new THREE.BoxGeometry(.27,.72,.28),mats.dark);leg.position.set(s*.22,.36,0);g.add(leg)}
+if(boss){for(const s of [-1,1]){const horn=new THREE.Mesh(new THREE.ConeGeometry(.13,.6,5),mats.gold);horn.position.set(s*.25,2.95,0);horn.rotation.z=s*-.35;g.add(horn)}}
+g.position.set(x,0,z);scene.add(g);enemies.push({g,hp:boss?9:4,max:boss?9:4,boss,speed:boss?1.1:1.45,attackCd:1+Math.random(),hit:0,alive:true});return g}
+makeEnemy(-2,-15);makeEnemy(3,-18);
+let bossSpawned=false,health=100,stamina=100,souls=0,gameOver=false,attackCd=0,dodgeTime=0,guarding=false,lockTarget=false,invulnerable=0,actionState='idle';
+const clock=new THREE.Clock();let yaw=0,pitch=.1,moveX=0,moveY=0,stickPointer=null,lookPointer=null,lastLookX=0,lastLookY=0;
+const stickArea=$('stickArea'),stick=$('stick');
+function setStick(e){const r=stickArea.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),max=r.width*.32,len=Math.hypot(dx,dy)||1,x=len>max?dx/len*max:dx,y=len>max?dy/len*max:dy;stick.style.transform='translate(calc(-50% + '+x+'px),calc(-50% + '+y+'px))';moveX=x/max;moveY=y/max}
+stickArea.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();stickPointer=e.pointerId;stickArea.setPointerCapture(e.pointerId);setStick(e)});
+stickArea.addEventListener('pointermove',e=>{if(e.pointerId===stickPointer){e.preventDefault();setStick(e)}});
+function resetStick(e){if(!e||e.pointerId===stickPointer){stickPointer=null;moveX=moveY=0;stick.style.transform='translate(-50%,-50%)'}}
+stickArea.addEventListener('pointerup',resetStick);stickArea.addEventListener('pointercancel',resetStick);stickArea.addEventListener('lostpointercapture',resetStick);
+// Touch-look uses a dedicated empty zone on the right half; action buttons stop propagation.
+renderer.domElement.addEventListener('pointerdown',e=>{if(e.clientX<innerWidth*.38)return;lookPointer=e.pointerId;lastLookX=e.clientX;lastLookY=e.clientY;try{renderer.domElement.setPointerCapture(e.pointerId)}catch{}});
+renderer.domElement.addEventListener('pointermove',e=>{if(e.pointerId!==lookPointer)return;const dx=e.clientX-lastLookX,dy=e.clientY-lastLookY;lastLookX=e.clientX;lastLookY=e.clientY;yaw-=dx*.007;pitch=THREE.MathUtils.clamp(pitch+dy*.003,-.12,.4)});
+function endLook(e){if(e.pointerId===lookPointer)lookPointer=null}
+renderer.domElement.addEventListener('pointerup',endLook);renderer.domElement.addEventListener('pointercancel',endLook);
+function buttonAction(id,fn,hold=false){const el=$(id);const down=e=>{e.preventDefault();e.stopPropagation();try{el.setPointerCapture(e.pointerId)}catch{}el.classList.add('pressed');fn(true)};const up=e=>{e.preventDefault();e.stopPropagation();el.classList.remove('pressed');fn(false)};el.addEventListener('pointerdown',down);el.addEventListener('pointerup',up);el.addEventListener('pointercancel',up);el.addEventListener('lostpointercapture',()=>{el.classList.remove('pressed');fn(false)});el.addEventListener('contextmenu',e=>e.preventDefault())}
+function attack(){if(gameOver||attackCd>0||stamina<12)return;attackCd=.48;stamina=Math.max(0,stamina-12);actionState='attack';let target=null,best=3.1;for(const e of enemies){if(!e.alive)continue;const d=player.position.distanceTo(e.g.position);if(d<best){best=d;target=e}}if(target){target.hp-=target.boss?1:2;target.hit=.18;target.g.position.add(new THREE.Vector3(0,0,.18));if(target.hp<=0){target.alive=false;scene.remove(target.g);souls+=target.boss?500:100;$('souls').textContent=souls;if(!target.boss&&!bossSpawned&&enemies.filter(e=>e.alive&&!e.boss).length===0){bossSpawned=true;makeEnemy(0,-24,true);$('objective').textContent='BOSS · THE WARDEN OF ASH';$('hint').textContent='The Warden of Ash has awakened.'}if(target.boss){$('objective').textContent='KINGDOM GATE CLEARED';end('VICTORY','The Warden has fallen. The kingdom still hides deeper horrors.')}}}}
+let dodging=false;
+buttonAction('attack',v=>{if(v)attack()});
+buttonAction('dodge',v=>{if(v&&!gameOver&&stamina>=25&&dodgeTime<=0){stamina-=25;dodgeTime=.38;invulnerable=.48;actionState='dodge'}});
+buttonAction('guard',v=>{guarding=v&&!gameOver});
+buttonAction('lock',v=>{if(v){lockTarget=!lockTarget;$('lock').textContent=lockTarget?'UNLOCK':'LOCK'}});
+const keys={};addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.code==='Space'){e.preventDefault();attack()}if(e.key.toLowerCase()==='shift'&&stamina>=25){dodgeTime=.38;invulnerable=.4;stamina-=25}});addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+function setHealth(v){health=THREE.MathUtils.clamp(v,0,100);$('hp').style.width=health+'%';if(health<=0)end('YOU HAVE FALLEN','The gate remains sealed. Rise again and face the Warden.')}
+function end(title,msg){gameOver=true;$('endTitle').textContent=title;$('endText').textContent=msg;$('overlay').style.display='flex'}
+function restart(){for(const e of enemies)scene.remove(e.g);enemies.length=0;player.position.set(0,0,2);yaw=0;health=100;stamina=100;souls=0;bossSpawned=false;gameOver=false;attackCd=0;dodgeTime=0;invulnerable=0;guarding=false;$('souls').textContent='0';$('hp').style.width='100%';$('stamina').style.width='100%';$('overlay').style.display='none';$('objective').textContent='MISSION I · ENTER THE RUINED GATE';makeEnemy(-2,-15);makeEnemy(3,-18)}
+$('restart').addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();restart()});$('restart').addEventListener('click',restart);
+function update(dt){if(gameOver)return;attackCd=Math.max(0,attackCd-dt);dodgeTime=Math.max(0,dodgeTime-dt);invulnerable=Math.max(0,invulnerable-dt);if(!guarding&&dodgeTime<=0)stamina=Math.min(100,stamina+22*dt);else if(guarding)stamina=Math.max(0,stamina-10*dt);$('stamina').style.width=stamina+'%';$('enemyCount').textContent=String(enemies.filter(e=>e.alive).length).padStart(2,'0');
+let ix=moveX,iy=moveY;if(keys.a||keys.arrowleft)ix-=1;if(keys.d||keys.arrowright)ix+=1;if(keys.w||keys.arrowup)iy-=1;if(keys.s||keys.arrowdown)iy+=1;const len=Math.hypot(ix,iy);if(len>1){ix/=len;iy/=len}
+const moving=Math.abs(ix)+Math.abs(iy)>.08;if(moving&&dodgeTime<=0){const speed=guarding?1.8:4.3;const dx=(ix*Math.cos(yaw)+iy*Math.sin(yaw))*speed*dt,dz=(-ix*Math.sin(yaw)+iy*Math.cos(yaw))*speed*dt;player.position.x=THREE.MathUtils.clamp(player.position.x+dx,-15,15);player.position.z=THREE.MathUtils.clamp(player.position.z+dz,-32,9);player.rotation.y=Math.atan2(-dx,-dz);actionState='move'}else if(dodgeTime>0){const dir=new THREE.Vector3(ix,0,iy);if(dir.lengthSq()<.1)dir.set(0,0,1);dir.normalize().applyAxisAngle(new THREE.Vector3(0,1,0),yaw);player.position.addScaledVector(dir,11*dt);player.position.x=THREE.MathUtils.clamp(player.position.x,-15,15);player.position.z=THREE.MathUtils.clamp(player.position.z,-32,9);actionState='dodge'}else if(!guarding)actionState='idle';
+if(guarding)actionState='guard';
+let active=enemies.filter(e=>e.alive);for(const e of active){e.attackCd-=dt;const delta=player.position.clone().sub(e.g.position);const d=delta.length();if(d>1.5){delta.normalize();e.g.position.addScaledVector(delta,e.speed*dt);e.g.rotation.y=Math.atan2(-delta.x,-delta.z)}else if(e.attackCd<=0){e.attackCd=e.boss?1.0:1.35;if(invulnerable<=0){let damage=e.boss?17:10;if(guarding&&stamina>0){damage=3;stamina=Math.max(0,stamina-18)}setHealth(health-damage)}}if(e.hit>0){e.hit-=dt;e.g.position.y=.06}else e.g.position.y=0}
+const dist=8.0;const desired=new THREE.Vector3(player.position.x+Math.sin(yaw)*dist,4.1+pitch*5,player.position.z+Math.cos(yaw)*dist);camera.position.lerp(desired,1-Math.pow(.002,dt));camera.lookAt(player.position.x,1.15,player.position.z);
+for(const t of torches){t.flame.scale.setScalar(.85+Math.random()*.35);t.l.intensity=2.1+Math.random()*1.3}
+}
+const clock=new THREE.Clock();function frame(){requestAnimationFrame(frame);update(Math.min(clock.getDelta(),.04));renderer.render(scene,camera)}camera.position.set(0,4,10);camera.lookAt(0,1,-3);frame();
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(devicePixelRatio,1.35));renderer.setSize(innerWidth,innerHeight)});
+try{screen.orientation?.lock?.('landscape').catch(()=>{})}catch{}
+$('hint').textContent=matchMedia('(pointer:coarse)').matches?'Left stick moves · Drag the open right side to turn · Attack, Dodge and Guard':'WASD move · Drag right side to turn · Space attack · Shift dodge · Hold Guard';
+</script>
+</body></html>
