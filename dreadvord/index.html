@@ -52,6 +52,18 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'GLTFLoader';
 const $=id=>document.getElementById(id);
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x11151c);scene.fog=new THREE.Fog(0x11151c,18,68);
+
+// Living sky: daylight cycle, sun/moon, layered procedural clouds and region-ready weather palette.
+const skyDome=new THREE.Mesh(new THREE.SphereGeometry(85,24,16),new THREE.MeshBasicMaterial({color:0x72b8ed,side:THREE.BackSide,depthWrite:false}));
+skyDome.position.y=8;scene.add(skyDome);
+const skyColors=[new THREE.Color(0x14213b),new THREE.Color(0xf1a45f),new THREE.Color(0x75b9ee),new THREE.Color(0xf5c77d),new THREE.Color(0x18233c)];
+const skyCloudMat=new THREE.MeshStandardMaterial({color:0xf2f4f6,roughness:1,transparent:true,opacity:.74,depthWrite:false});
+const cloudLayer=new THREE.Group();scene.add(cloudLayer);
+for(let i=0;i<24;i++){const cloud=new THREE.Group();const n=3+(i%4);for(let j=0;j<n;j++){const puff=new THREE.Mesh(new THREE.SphereGeometry(.7+(j%3)*.22,7,5),skyCloudMat);puff.scale.set(1.7,.38,.8);puff.position.set((j-(n-1)/2)*.78,(j%2)*.1,0);cloud.add(puff)}cloud.position.set((Math.random()-.5)*100,19+Math.random()*13,-40+Math.random()*55);cloud.userData.speed=.18+Math.random()*.24;cloudLayer.add(cloud)}
+const skySun=new THREE.Mesh(new THREE.SphereGeometry(2.1,12,10),new THREE.MeshBasicMaterial({color:0xffe4a2}));scene.add(skySun);
+const weather={phase:0,storm:0};
+function updateSky(dt){weather.phase=(weather.phase+dt*.018)%(Math.PI*2);const daylight=(Math.sin(weather.phase)+1)*.5;const palette=skyColors[0].clone().lerp(skyColors[2],daylight);if(weather.storm>0)palette.lerp(new THREE.Color(0x333b4a),weather.storm);scene.background=palette;scene.fog.color.copy(palette);skyDome.material.color.copy(palette);skyDome.rotation.y+=dt*.001;const sunAngle=weather.phase;skySun.position.set(Math.cos(sunAngle)*48,Math.sin(sunAngle)*32+8,-45);skySun.visible=daylight>.18;moon.position.set(-skySun.position.x,Math.max(8,35-skySun.position.y),-skySun.position.z*.4);moon.intensity=.35+daylight*1.9;cloudLayer.children.forEach(c=>{c.position.x+=c.userData.speed*dt;if(c.position.x>55)c.position.x=-55});weather.storm=Math.max(0,weather.storm-dt*.006)}
+
 const camera=new THREE.PerspectiveCamera(58,innerWidth/innerHeight,.1,140);
 const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio,1.35));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;$('game').appendChild(renderer.domElement);
 scene.add(new THREE.HemisphereLight(0x9caec9,0x211c1b,1.5));
@@ -109,7 +121,7 @@ function setHealth(v){health=THREE.MathUtils.clamp(v,0,100);$('hp').style.width=
 function end(title,msg){gameOver=true;$('endTitle').textContent=title;$('endText').textContent=msg;$('overlay').style.display='flex'}
 function restart(){for(const e of enemies)scene.remove(e.g);enemies.length=0;player.position.set(0,0,2);yaw=0;health=100;stamina=100;souls=0;bossSpawned=false;gameOver=false;attackCd=0;dodgeTime=0;invulnerable=0;guarding=false;$('souls').textContent='0';$('hp').style.width='100%';$('stamina').style.width='100%';$('overlay').style.display='none';$('objective').textContent='MISSION I · ENTER THE RUINED GATE';makeEnemy(-2,-15);makeEnemy(3,-18)}
 $('restart').addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();restart()});$('restart').addEventListener('click',restart);
-function update(dt){if(gameOver)return;attackCd=Math.max(0,attackCd-dt);dodgeTime=Math.max(0,dodgeTime-dt);invulnerable=Math.max(0,invulnerable-dt);if(!guarding&&dodgeTime<=0)stamina=Math.min(100,stamina+22*dt);else if(guarding)stamina=Math.max(0,stamina-10*dt);$('stamina').style.width=stamina+'%';$('enemyCount').textContent=String(enemies.filter(e=>e.alive).length).padStart(2,'0');
+function update(dt){updateSky(dt);if(gameOver)return;attackCd=Math.max(0,attackCd-dt);dodgeTime=Math.max(0,dodgeTime-dt);invulnerable=Math.max(0,invulnerable-dt);if(!guarding&&dodgeTime<=0)stamina=Math.min(100,stamina+22*dt);else if(guarding)stamina=Math.max(0,stamina-10*dt);$('stamina').style.width=stamina+'%';$('enemyCount').textContent=String(enemies.filter(e=>e.alive).length).padStart(2,'0');
 let ix=moveX,iy=moveY;if(keys.a||keys.arrowleft)ix-=1;if(keys.d||keys.arrowright)ix+=1;if(keys.w||keys.arrowup)iy-=1;if(keys.s||keys.arrowdown)iy+=1;const len=Math.hypot(ix,iy);if(len>1){ix/=len;iy/=len}
 const moving=Math.abs(ix)+Math.abs(iy)>.08;if(moving&&dodgeTime<=0){const speed=guarding?1.8:4.3;const dx=(ix*Math.cos(yaw)+iy*Math.sin(yaw))*speed*dt,dz=(-ix*Math.sin(yaw)+iy*Math.cos(yaw))*speed*dt;player.position.x=THREE.MathUtils.clamp(player.position.x+dx,-15,15);player.position.z=THREE.MathUtils.clamp(player.position.z+dz,-32,9);player.rotation.y=Math.atan2(-dx,-dz);actionState='move'}else if(dodgeTime>0){const dir=new THREE.Vector3(ix,0,iy);if(dir.lengthSq()<.1)dir.set(0,0,1);dir.normalize().applyAxisAngle(new THREE.Vector3(0,1,0),yaw);player.position.addScaledVector(dir,11*dt);player.position.x=THREE.MathUtils.clamp(player.position.x,-15,15);player.position.z=THREE.MathUtils.clamp(player.position.z,-32,9);actionState='dodge'}else if(!guarding)actionState='idle';
 if(guarding)actionState='guard';
