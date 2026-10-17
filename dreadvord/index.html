@@ -85,7 +85,7 @@ if(boss){for(const s of [-1,1]){const horn=new THREE.Mesh(new THREE.ConeGeometry
 g.position.set(x,0,z);scene.add(g);enemies.push({g,hp:boss?9:4,max:boss?9:4,boss,speed:boss?1.1:1.45,attackCd:1+Math.random(),hit:0,alive:true});return g}
 makeEnemy(-2,-15);makeEnemy(3,-18);
 let bossSpawned=false,health=100,stamina=100,souls=0,gameOver=false,attackCd=0,dodgeTime=0,guarding=false,lockTarget=false,invulnerable=0,actionState='idle';
-const clock=new THREE.Clock();let yaw=0,pitch=.1,moveX=0,moveY=0,stickPointer=null,lookPointer=null,lastLookX=0,lastLookY=0;
+let yaw=0,pitch=.1,moveX=0,moveY=0,stickPointer=null,lookPointer=null,lastLookX=0,lastLookY=0;
 const stickArea=$('stickArea'),stick=$('stick');
 function setStick(e){const r=stickArea.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),max=r.width*.32,len=Math.hypot(dx,dy)||1,x=len>max?dx/len*max:dx,y=len>max?dy/len*max:dy;stick.style.transform='translate(calc(-50% + '+x+'px),calc(-50% + '+y+'px))';moveX=x/max;moveY=y/max}
 stickArea.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();stickPointer=e.pointerId;stickArea.setPointerCapture(e.pointerId);setStick(e)});
