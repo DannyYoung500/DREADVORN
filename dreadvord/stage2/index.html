@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+  <title>DREADVORD — The Fallen Kingdom</title>
+  <style>
+    :root {
+      --bg:#090b0f; --panel:rgba(10,13,17,.88); --gold:#d9b56e; --steel:#9aaab4; --red:#7a2d24;
+      --line:rgba(217,181,110,.35); --green:#7aa35d;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;overflow:hidden;background:#090b0f;color:#f5e9d3;font-family:system-ui,Segoe UI,Arial,sans-serif;touch-action:none}
+    #game{position:fixed;inset:0}
+    canvas{display:block;width:100%;height:100%}
+    #hud{position:fixed;inset:0;pointer-events:none;z-index:4}
+    .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 12px;backdrop-filter:blur(6px)}
+    .top{position:absolute;left:14px;right:14px;top:14px;display:flex;justify-content:space-between;align-items:flex-start}
+    .brand{min-width:180px}
+    .brand b{display:block;letter-spacing:.18em;color:var(--gold);font-size:clamp(13px,2vw,18px)}
+    .brand small{letter-spacing:.12em;color:#c6ba9e;font-size:9px}
+    .stats{display:flex;gap:12px;font-size:11px;letter-spacing:.1em;color:#cabca3}
+    .stats b{display:block;color:#fff3d1;font-size:15px;letter-spacing:0}
+    #bars{position:absolute;left:14px;top:86px;width:min(220px,30vw)}
+    .label{font-size:10px;letter-spacing:.18em;color:#d7c7af;margin:6px 0 4px}
+    .bar{height:10px;border-radius:999px;background:#1a1d1f;overflow:hidden;border:1px solid rgba(255,255,255,.08)}
+    .fill{height:100%;width:100%}
+    .fill.hp{background:linear-gradient(90deg,#8e2d2d,#c05b4d)}
+    .fill.stam{background:linear-gradient(90deg,#6b7d3b,#b7d770)}
+    #objective{position:absolute;left:50%;top:92px;transform:translateX(-50%);max-width:min(60vw,500px);text-align:center;font-size:12px;letter-spacing:.12em;color:#f3d8a9}
+    #controls{position:fixed;inset:0;pointer-events:none;z-index:5}
+    #stickArea{pointer-events:auto;position:absolute;left:16px;bottom:18px;width:124px;height:124px;border-radius:50%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12)}
+    #stick{position:absolute;left:50%;top:50%;width:44px;height:44px;border-radius:50%;background:#d5b46a;border:2px solid rgba(255,255,255,.25);transform:translate(-50%,-50%)}
+    .actions{pointer-events:auto;position:absolute;right:16px;bottom:18px;display:grid;grid-template-columns:repeat(2,72px);gap:10px}
+    .action{width:72px;height:72px;border-radius:14px;border:1px solid rgba(217,181,110,.45);background:rgba(17,22,27,.9);color:#f2e3c2;font-weight:900;letter-spacing:.08em}
+    #attack{background:#5a2726}
+    #dodge{background:#2b3d24}
+    #guard{background:#24313c}
+    #pause{background:#282829}
+    #overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);align-items:center;justify-content:center;z-index:10}
+    .card{background:#0c1015;border:1px solid var(--line);border-radius:14px;padding:22px 26px;text-align:center;max-width:360px}
+    .card h1{margin:0 0 10px;color:var(--gold);letter-spacing:.12em}
+    .card p{margin:0 0 18px;color:#e0d6bc;line-height:1.5}
+    #restart{width:150px;height:42px;border-radius:10px;border:1px solid var(--line);background:linear-gradient(180deg,#d9b56e,#af884f);color:#1a160d;font-weight:900}
+    @media (orientation:portrait) and (pointer:coarse){#objective{top:96px;max-width:72vw;font-size:11px} }
+  </style>
+</head>
+<body>
+  <div id="game"></div>
+  <div id="hud">
+    <div class="top">
+      <div class="panel brand"><b>DREADVORD</b><small>THE FALLEN KINGDOM</small></div>
+      <div class="panel stats">
+        <div>ENEMIES<b id="enemyCount">0</b></div>
+        <div>SOULS<b id="souls">0</b></div>
+      </div>
+    </div>
+    <div id="bars" class="panel">
+      <div class="label">VITALITY</div>
+      <div class="bar"><div id="hp" class="fill hp" style="width:100%"></div></div>
+      <div class="label">STAMINA</div>
+      <div class="bar"><div id="stam" class="fill stam" style="width:100%"></div></div>
+    </div>
+    <div id="objective" class="panel">MISSION: ENTER THE RUINED GATE</div>
+  </div>
+  <div id="controls">
+    <div id="stickArea"><div id="stick"></div></div>
+    <div class="actions">
+      <button id="attack" class="action">ATTACK</button>
+      <button id="dodge" class="action">DODGE</button>
+      <button id="guard" class="action">GUARD</button>
+      <button id="pause" class="action">PAUSE</button>
+    </div>
+  </div>
+  <div id="overlay">
+    <div class="card">
+      <h1 id="endTitle">PAUSED</h1>
+      <p id="endText">The gate remains sealed.</p>
+      <button id="restart">RESUME</button>
+    </div>
+  </div>
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+    import { Game } from './src/Game.js';
+    const game = new Game({ mount: document.getElementById('game') });
+    game.start();
+
+    const overlay = document.getElementById('overlay');
+    const restart = document.getElementById('restart');
+    const pauseBtn = document.getElementById('pause');
+    pauseBtn.addEventListener('pointerdown', () => {
+      game.togglePause();
+      if (game.paused) {
+        overlay.style.display = 'flex';
+        document.getElementById('endTitle').textContent = 'PAUSED';
+        document.getElementById('endText').textContent = 'The gate remains sealed.';
+      } else {
+        overlay.style.display = 'none';
+      }
+    });
+    restart.addEventListener('pointerdown', () => {
+      game.togglePause();
+      overlay.style.display = 'none';
+    });
+  </script>
+</body>
+</html>
